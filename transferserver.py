@@ -9,8 +9,8 @@ import sys
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-S3_BUCKET_NAME = environ.get('source_bucket')
-VFX_VENDOR_TEST = environ.get('destination_bucket')
+S3_BUCKET_NAME = environ.get('S3_BUCKET_NAME')
+VFX_VENDOR_TEST = environ.get('VFX_VENDOR_TEST')
 KEY = str(sys.argv[1])
 aws_access_key_id=environ.get('aws_access_key_id')
 aws_secret_access_key=environ.get('aws_secret_access_key')
