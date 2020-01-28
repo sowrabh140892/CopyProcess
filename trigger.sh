@@ -1,6 +1,6 @@
 #!/bin/sh
 
-COPY=$(aws s3 cp s3://source1408/$1 /tmp/copy.txt)
+COPY=$(aws s3 cp $1 /tmp/copy.txt)
 LINE=$((AWS_BATCH_JOB_ARRAY_INDEX + 1))
 echo $LINE
 LINE=$(sed -n ${LINE}p /tmp/copy.txt)
