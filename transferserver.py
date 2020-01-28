@@ -13,9 +13,7 @@ source_bucket_key=str(sys.argv[1])
 destination_bucket_key=str(sys.argv[2])
 source_bucket_name=str(sys.argv[3])
 destination_bucket_name=str(sys.argv[4])
-aws_access_key_id=environ.get('aws_access_key_id')
-aws_secret_access_key=environ.get('aws_secret_access_key')
-session = boto3.Session(aws_access_key_id, aws_secret_access_key, region_name='us-east-1', )
+session = boto3.Session(region_name='us-east-1', )
 print dir(session)
 
 def copy_to_vfx_vendor_test(source_bucket_key, destination_bucket_key, source_bucket_name, destination_bucket_name):
