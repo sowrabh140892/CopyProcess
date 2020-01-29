@@ -1,6 +1,6 @@
 #!/bin/sh
 
-COPY=$(aws s3 cp $1 /tmp/copy.txt)
+COPY=$(aws s3 cp s3://aws-batch-parameter/$1 /tmp/copy.txt)
 LINE=$((AWS_BATCH_JOB_ARRAY_INDEX + 1))
 echo $LINE
 LINE=$(sed -n ${LINE}p /tmp/copy.txt)
@@ -10,4 +10,4 @@ SOURCEKEY=${VAR[0]}
 DESTINATIONKEY=${VAR[1]}
 SOURCEBUCKET=${VAR[2]}
 DESTINATIONBUCKET=${VAR[3]}
-echo $(python /transferS3-master/transferserver.py $SOURCEKEY $DESTINATIONKEY $SOURCEBUCKET $DESTINATIONBUCKET)
+echo $(python ./S3transfercopy-master/transferserver.py $SOURCEKEY $DESTINATIONKEY $SOURCEBUCKET $DESTINATIONBUCKET)
