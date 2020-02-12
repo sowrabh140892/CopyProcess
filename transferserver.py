@@ -5,7 +5,9 @@ from os import environ
 import re
 import logging
 import sys
-
+import sentry_sdk
+from sentry_sdk.integrations.logging import ignore_logger
+sentry_sdk.init(dsn='https://2fee4ed938294813aeeb28f08e3614b8@sentry.io/1858927')
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -13,7 +15,7 @@ source_bucket_key=str(sys.argv[1])
 destination_bucket_key=str(sys.argv[2])
 source_bucket_name=str(sys.argv[3])
 destination_bucket_name=str(sys.argv[4])
-session = boto3.Session(region_name='us-east-1', )
+session = boto3.Session(region_name='ap-southeast-2')
 print dir(session)
 
 def copy_to_vfx_vendor_test(source_bucket_key, destination_bucket_key, source_bucket_name, destination_bucket_name):
@@ -23,16 +25,21 @@ def copy_to_vfx_vendor_test(source_bucket_key, destination_bucket_key, source_bu
     :param destination_bucket_name:
     :return:
     """
-    s3_resource = session.resource('s3')
-    copy_source = {
-        'Bucket': source_bucket_name,
-        'Key': source_bucket_key
-    }
-    bucket = s3_resource.Bucket(destination_bucket_name)
-    obj = bucket.Object(destination_bucket_key)
-    print "Copying key %s" % source_bucket_key
-    obj.copy(copy_source)
-    print "Copy Completed!"
+    try:
+        s3_resource = session.resource('s3')
+        copy_source = {
+                'Bucket': source_bucket_name,
+                'Key': source_bucket_key
+            }
+        bucket = s3_resource.Bucket(destination_bucket_name)
+        obj = bucket.Object(destination_bucket_key)
+        print "Copying key %s" % source_bucket_key
+        obj.copy(copy_source)
+        print "Copy Completed!"
+    except Exception as e:
+        raise ValueError('Error while copying S3 objects %s from %s to %s - %s '%(source_bucket_key,source_bucket_name,destination_bucket_name,destination_bucket_key))
+    finally:
+        logger.info('Copying process ended')
 
 def main():
     """
