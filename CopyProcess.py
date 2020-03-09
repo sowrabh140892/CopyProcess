@@ -15,6 +15,9 @@ logger.setLevel(logging.INFO)
 
 if 'AWS_BATCH_JOB_ARRAY_INDEX' in os.environ:
     count=int(os.environ['AWS_BATCH_JOB_ARRAY_INDEX'])
+else:
+    count=0
+
 print(count)
 
 BUCKET='aws-batch-parameter'
