@@ -6,6 +6,7 @@ import time
 import re
 import logging
 import sys
+import shotgun_api3
 import sentry_sdk
 from sentry_sdk.integrations.logging import ignore_logger
 sentry_sdk.init(dsn='https://2fee4ed938294813aeeb28f08e3614b8@sentry.io/1858927')
@@ -13,12 +14,24 @@ sentry_sdk.init(dsn='https://2fee4ed938294813aeeb28f08e3614b8@sentry.io/1858927'
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+try:
+    SHOTGUN_SCRIPT_NAME=str(os.environ['SHOTGUN_SCRIPT_NAME'])
+    SHOTGUN_SCRIPT_KEY=str(os.environ['SHOTGUN_SCRIPT_KEY'])
+    SHOTGUN_HOST_NAME=str(os.environ['SHOTGUN_HOST_NAME'])	
+except Exception as e:
+    raise ValueError('Error while accessing Shotgun details from environment variables')
+    logger.info('Error while accessing Shotgun details from environment variables')
+
+
+
 if 'AWS_BATCH_JOB_ARRAY_INDEX' in os.environ:
     count=int(os.environ['AWS_BATCH_JOB_ARRAY_INDEX'])
 else:
     count=0
 
 print(count)
+
+
 
 BUCKET='aws-batch-parameter'
 KEY=str(sys.argv[1])
@@ -43,8 +56,19 @@ source_bucket_name=str(line[2])
 source_region=str(line[3])
 destination_bucket_name=str(line[4])
 destination_region=str(line[5])
+SHOTGUN_TYPE=str(line[7])
+SHOTGUN_ENTITY_ID=str(line[8])
+SHOTGUN_ENTITY_TYPE=str(line[9])
+SHOTGUN_ATTRIBUTE_NAME=str(line[10])
+SHOTGUN_ATTRIBUTE_VALUE=str(line[11])
+SHOTGUN_ATTRIBUTE_VALUE=SHOTGUN_ATTRIBUTE_VALUE.replace("-"," ")
 
 print(line)
+
+if count==0:
+    sg = shotgun_api3.Shotgun(SHOTGUN_HOST_NAME, SHOTGUN_SCRIPT_NAME, SHOTGUN_SCRIPT_KEY)
+    sg.create("Reply", {"entity": {"type": SHOTGUN_ENTITY_TYPE, "id": int(SHOTGUN_ENTITY_ID)},"content": "AWS Copy Started..."})
+					
 
 def copy_to_vfx_vendor_test(source_bucket_key, destination_bucket_key, source_bucket_name, destination_bucket_name):
     """
