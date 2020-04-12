@@ -33,7 +33,7 @@ print(count)
 
 
 
-BUCKET='aws-batch-parameter'
+BUCKET='aws-batch-parameters'
 KEY=str(sys.argv[1])
 session = boto3.Session()
 
