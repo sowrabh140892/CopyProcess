@@ -99,7 +99,7 @@ def copy_to_vfx_vendor_test(source_bucket_key, destination_bucket_key, source_bu
         }
         s3.copy(copy_source, destination_bucket_name, destination_bucket_key, SourceClient=source_client)
 	Status = "Success"
-        print "Copy Completed!"
+        print("Copy Completed!")
     except Exception as e:
         raise ValueError('Error while copying S3 objects %s from %s to %s - %s '%(source_bucket_key,source_bucket_name,destination_bucket_name,destination_bucket_key))
 	Status = "Failure"
@@ -113,7 +113,7 @@ def copy_to_vfx_vendor_test(source_bucket_key, destination_bucket_key, source_bu
 				}
 		)
 
-		print("PutItem succeeded:")
+	print("PutItem succeeded:")
 
 
 def main():
