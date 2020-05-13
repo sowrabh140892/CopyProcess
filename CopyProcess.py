@@ -10,7 +10,6 @@ import shotgun_api3
 import sentry_sdk
 import decimal
 from sentry_sdk.integrations.logging import ignore_logger
-from __future__ import print_function
 sentry_sdk.init(dsn='https://2fee4ed938294813aeeb28f08e3614b8@sentry.io/1858927')
 
 logger = logging.getLogger()
