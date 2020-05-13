@@ -8,11 +8,19 @@ import logging
 import sys
 import shotgun_api3
 import sentry_sdk
+import decimal
 from sentry_sdk.integrations.logging import ignore_logger
+from __future__ import print_function
 sentry_sdk.init(dsn='https://2fee4ed938294813aeeb28f08e3614b8@sentry.io/1858927')
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+
+table = dynamodb.Table('CopyProcess-Log')
+
+
 
 try:
     SHOTGUN_SCRIPT_NAME=str(os.environ['SHOTGUN_SCRIPT_NAME'])
@@ -63,6 +71,11 @@ SHOTGUN_ATTRIBUTE_NAME=str(line[10])
 SHOTGUN_ATTRIBUTE_VALUE=str(line[11])
 SHOTGUN_ATTRIBUTE_VALUE=SHOTGUN_ATTRIBUTE_VALUE.replace("-"," ")
 
+
+ProcessID = SHOTGUN_ENTITY_ID
+ProcessNumber = count+1
+
+
 print(line)
 
 if count==0:
@@ -85,11 +98,23 @@ def copy_to_vfx_vendor_test(source_bucket_key, destination_bucket_key, source_bu
             'Key': source_bucket_key
         }
         s3.copy(copy_source, destination_bucket_name, destination_bucket_key, SourceClient=source_client)
+		Status = "Success"
         print "Copy Completed!"
     except Exception as e:
         raise ValueError('Error while copying S3 objects %s from %s to %s - %s '%(source_bucket_key,source_bucket_name,destination_bucket_name,destination_bucket_key))
+		Status = "Success"
     finally:
-        logger.info('Copying process ended')
+        logger.info('Copying process ended')'
+		response = table.put_item(
+			Item={
+				'ProcessID': ProcessID,
+				'ProcessNumber': ProcessNumber,
+				'Status': Status
+				}
+		)
+
+		print("PutItem succeeded:")
+
 
 def main():
     """
