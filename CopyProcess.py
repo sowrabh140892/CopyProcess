@@ -105,14 +105,7 @@ def copy_to_vfx_vendor_test(source_bucket_key, destination_bucket_key, source_bu
 	Status = "Failure"
     finally:
         logger.info('Copying process ended')
-		response = table.put_item(
-			Item={
-				'ProcessID': ProcessID,
-				'ProcessNumber': ProcessNumber,
-				'Status': Status
-				}
-		)
-
+	response = table.put_item(Item={'ProcessID': ProcessID,'ProcessNumber': ProcessNumber,'Status': Status})
 	print("PutItem succeeded:")
 
 
