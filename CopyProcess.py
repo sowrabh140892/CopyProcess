@@ -1,101 +1,125 @@
 import boto3
-import json
 import os
-from os import environ
-import time
-import re
 import logging
 import sys
-import shotgun_api3
+import traceback
+import pprint
+import time
+from decimal import Decimal
+import json
 import sentry_sdk
-from sentry_sdk.integrations.logging import ignore_logger
-sentry_sdk.init(dsn='https://2fee4ed938294813aeeb28f08e3614b8@sentry.io/1858927')
+sentry_sdk.init(dsn="https://b2c77e36a6794ca08dd31681c645c876@sentry.io/1412782")
 
+import Utilities
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-try:
-    SHOTGUN_SCRIPT_NAME=str(os.environ['SHOTGUN_SCRIPT_NAME'])
-    SHOTGUN_SCRIPT_KEY=str(os.environ['SHOTGUN_SCRIPT_KEY'])
-    SHOTGUN_HOST_NAME=str(os.environ['SHOTGUN_HOST_NAME'])	
-except Exception as e:
-    raise ValueError('Error while accessing Shotgun details from environment variables')
-    logger.info('Error while accessing Shotgun details from environment variables')
-
-
 
 if 'AWS_BATCH_JOB_ARRAY_INDEX' in os.environ:
-    count=int(os.environ['AWS_BATCH_JOB_ARRAY_INDEX'])
+    count = int(os.environ['AWS_BATCH_JOB_ARRAY_INDEX'])
 else:
-    count=0
+    count = 0
 
-print(count)
+logger.info("Count: {}".format(count))
 
 
+class Delivery(object):
+    def __init__(self, sg, current_job_data, job_number, entity_type, entity_id, process_type, entity_status_updates):
+        self.job_data = current_job_data
+        self.count = job_number
+        self.entity_type = entity_type
+        self.entity_id = entity_id
+        self.process_type = process_type
+        self.entity_status_updates = entity_status_updates
+        self.sg = sg
 
-BUCKET='aws-batch-parameters'
-KEY=str(sys.argv[1])
-session = boto3.Session()
+    def deliver(self):
+        logger.info('copy process started')
+        if self.count == 0:
+            self.sg.create("Reply", {
+                "entity": {"type": self.entity_type, "id": int(self.entity_id)},
+                "content": "AWS Copy Started..."
+            })
 
-try:
-    s3 = boto3.resource('s3')
-    s3.Bucket(BUCKET).download_file(KEY, '/tmp/%s'%(KEY))
-except Exception as e:
-    raise ValueError('Error while downloading temmplate file %s from %s '%(BUCKET))
-    logger.info(' ERROR while downloading template file')
-finally:
-    logger.info('Downloading Template Ended')
+        target_client = boto3.client('s3')
+        source_client = boto3.client('s3')
 
-file=open('/tmp/%s'%(KEY)).read().splitlines()
-print(file[count])
-
-line = file[count].split(' ')
-source_bucket_key=str(line[0])
-destination_bucket_key=str(line[1])
-source_bucket_name=str(line[2])
-source_region=str(line[3])
-destination_bucket_name=str(line[4])
-destination_region=str(line[5])
-SHOTGUN_TYPE=str(line[7])
-SHOTGUN_ENTITY_ID=str(line[8])
-SHOTGUN_ENTITY_TYPE=str(line[9])
-SHOTGUN_ATTRIBUTE_NAME=str(line[10])
-SHOTGUN_ATTRIBUTE_VALUE=str(line[11])
-SHOTGUN_ATTRIBUTE_VALUE=SHOTGUN_ATTRIBUTE_VALUE.replace("-"," ")
-
-print(line)
-
-if count==0:
-    sg = shotgun_api3.Shotgun(SHOTGUN_HOST_NAME, SHOTGUN_SCRIPT_NAME, SHOTGUN_SCRIPT_KEY)
-    sg.create("Reply", {"entity": {"type": SHOTGUN_ENTITY_TYPE, "id": int(SHOTGUN_ENTITY_ID)},"content": "AWS Copy Started..."})
-					
-
-def copy_to_vfx_vendor_test(source_bucket_key, destination_bucket_key, source_bucket_name, destination_bucket_name):
-    """
-    :param bucket_key:
-    :param source_bucket_name:
-    :param destination_bucket_name:
-    :return:
-    """
-    try:
-        s3 = boto3.client('s3', destination_region)
-        source_client = boto3.client('s3', source_region)
         copy_source = {
-            'Bucket': source_bucket_name,
-            'Key': source_bucket_key
+            'Bucket': self.job_data['source_bucket'],
+            'Key': self.job_data['source_key']
         }
-        s3.copy(copy_source, destination_bucket_name, destination_bucket_key, SourceClient=source_client)
-        print "Copy Completed!"
-    except Exception as e:
-        raise ValueError('Error while copying S3 objects %s from %s to %s - %s '%(source_bucket_key,source_bucket_name,destination_bucket_name,destination_bucket_key))
-    finally:
-        logger.info('Copying process ended')
+
+        logger.info('trying to copy %s to %s %s' % (str(copy_source), self.job_data['target_bucket'],
+                                                    self.job_data['target_key']))
+
+        target_client.copy(copy_source, self.job_data['target_bucket'],
+                           self.job_data['target_key'], SourceClient=source_client)
+
+        logger.info("Copy Completed!")
+        return '%s://%s' % (self.job_data['target_bucket'], self.job_data['target_key'])
+
 
 def main():
     """
     :return:
     """
-    copy_to_vfx_vendor_test(source_bucket_key, destination_bucket_key, source_bucket_name, destination_bucket_name)
-	
+    bucket_name = str(sys.argv[1])
+    json_key = str(sys.argv[2])
+    logger.info('bucket_name - %s, json_key - %s' % (bucket_name, json_key))
+
+    logger.info('downloading and parsing json')
+    job_data = Utilities.get_json_data(bucket=bucket_name, obj_key=json_key)
+    logger.info('downloaded and parsing json')
+
+    required_keys = ['entity_type', 'entity_id', 'process_type', 'copy_data']
+    for _key in required_keys:
+        if _key not in job_data.keys():
+            raise ValueError('Invalid json file received')
+
+    start_time = time.time()
+    target_path = ''
+    try:
+        logger.info("getting sg object")
+        sg = Utilities.get_sg_object(job_data=job_data)
+        # dict to create the kwargs for the copy process
+        current_job_data = job_data['copy_data'][count]
+
+        logger.info("Current Job kwargs: {}".format(pprint.pformat(current_job_data)))
+        delivery = Delivery(sg=sg,
+                            current_job_data=current_job_data,
+                            job_number=count,
+                            entity_type=job_data['entity_type'],
+                            entity_id=int(job_data['entity_id']),
+                            process_type=job_data['process_type'],
+                            entity_status_updates=job_data['entity_status_updates'])
+        target_path = delivery.deliver()
+        status = "Success"
+        error_msg = ''
+
+    except Exception as e:
+        status = "Failure"
+        error_msg = 'Error while copying S3 object, json file - %s://%s, count - %s\n\nTraceback:\n%s' %\
+                    (bucket_name, json_key, count, traceback.format_exc())
+
+    process_time = time.time()-start_time
+
+    db_data_to_update = {'ProcessID': str(job_data['entity_id']), 'ProcessNumber': count + 1,
+                         'TargetPath': target_path, 'Status': status, 'Error': error_msg,
+                         'ProcessTime': round(process_time, 2)}
+    db_data_to_update = json.loads(json.dumps(db_data_to_update), parse_float=Decimal)
+    try:
+        logger.info("trying to update dynamo db")
+        dynamo_db = boto3.resource('dynamodb', region_name=job_data['batch_region'])
+        dynamo_table = dynamo_db.Table(job_data['dynamo_table_name'])
+        response = dynamo_table.put_item(Item=db_data_to_update)
+        logger.info("updated dynamo db")
+    except:
+        logger.info("failed to update dynamo db - raising error for sentry")
+        logger.exception('dynamodb update failed')
+        error_msg = 'Failed to update dynamo db for status'
+        error_msg += '\n\nStatus of transaction\n-%s' % str(db_data_to_update)
+        raise ValueError(error_msg)
+
+
 if __name__ == '__main__':
     main()
